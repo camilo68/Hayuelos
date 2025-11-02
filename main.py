@@ -3,8 +3,9 @@ from app_factory import create_app
 
 app = create_app()
 
+# Opcional: para debug local
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)
 
 # from flask import Flask, jsonify
 # from flask_cors import CORS
