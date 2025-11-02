@@ -5,6 +5,7 @@ from flask_mail import Message
 from werkzeug.utils import secure_filename
 from datetime import date, datetime, timedelta
 from sqlalchemy import func, extract
+from flask import current_app  # ¡AGREGA ESTO AL TOP!
 import bcrypt
 import os
 import secrets
@@ -68,51 +69,71 @@ def login():
 @auth_bp.route("/register", methods=["GET", "POST"])
 def register():
     form = RegisterForm()
+    
     if form.validate_on_submit():
-        # Verificar duplicados
-        if Empleado.query.filter_by(numero_documento=form.numero_documento.data).first():
-            flash("El número de documento ya está registrado", "danger")
-            return render_template("auth/register.html", form=form)
-        
-        if Empleado.query.filter_by(email=form.email.data).first():
-            flash("El email ya está registrado", "danger")
-            return render_template("auth/register.html", form=form)
-        
-        if Empleado.query.filter_by(usuario=form.usuario.data).first():
-            flash("El nombre de usuario ya está en uso", "danger")
-            return render_template("auth/register.html", form=form)
+        try:
+            # === VERIFICAR DUPLICADOS ===
+            doc = form.numero_documento.data.strip()
+            email = form.email.data.strip().lower()
+            usuario = form.usuario.data.strip()
+            
+            if Empleado.query.filter_by(numero_documento=doc).first():
+                flash("Número de documento ya registrado", "danger")
+                return render_template("auth/register.html", form=form)
+            
+            if Empleado.query.filter_by(email=email).first():
+                flash("Email ya registrado", "danger")
+                return render_template("auth/register.html", form=form)
+            
+            if Empleado.query.filter_by(usuario=usuario).first():
+                flash("Usuario ya existe", "danger")
+                return render_template("auth/register.html", form=form)
 
-        # Crear contraseña temporal
-        num_doc = form.numero_documento.data
-        contrasena_temporal = num_doc[-4:] if len(num_doc) >= 4 else num_doc
-        hash_cifrado = bcrypt.hashpw(contrasena_temporal.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+            # === CONTRASEÑA TEMPORAL ===
+            temp_pass = doc[-4:] if len(doc) >= 4 else doc
+            hashed = bcrypt.hashpw(temp_pass.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
-        nuevo_empleado = Empleado(
-            usuario=form.usuario.data,
-            nombre_empleado=form.nombre_empleado.data,
-            apellido_empleado=form.apellido_empleado.data,
-            numero_documento=form.numero_documento.data,
-            tipo_documento=form.tipo_documento.data,
-            email=form.email.data,
-            telefono=form.telefono.data,
-            direccion=form.direccion.data,
-            cargo_establecido=form.cargo_establecido.data,
-            contrasena=hash_cifrado,
-            temporal=True,
-            activo=True,
-            aceptado_terminos=form.aceptar_terminos.data
-        )
-        
-        db.session.add(nuevo_empleado)
-        db.session.commit()
-        
-        registrar_auditoria('CREATE', 'empleado', nuevo_empleado.id_empleados, None, {
-            'usuario': nuevo_empleado.usuario,
-            'nombre': nuevo_empleado.nombre_empleado
-        })
+            # === CREAR EMPLEADO ===
+            empleado = Empleado(
+                nombre_empleado=form.nombre_empleado.data.strip(),
+                apellido_empleado=form.apellido_empleado.data.strip(),
+                numero_documento=doc,
+                tipo_documento=form.tipo_documento.data,
+                email=email,
+                telefono=form.telefono.data.strip() or None,
+                direccion=form.direccion.data.strip() or None,
+                usuario=usuario,
+                cargo_establecido=form.cargo_establecido.data,
+                contrasena=hashed,
+                temporal=True,
+                activo=True,
+                aceptado_terminos=True
+            )
+            db.session.add(empleado)
+            db.session.commit()
 
-        flash(f"¡Registro exitoso! Tu contraseña temporal es: {contrasena_temporal}", "success")
-        return redirect(url_for("auth.login"))
+            registrar_auditoria('CREATE', 'empleado', empleado.id_empleados, None, {
+                'usuario': empleado.usuario, 'email': empleado.email
+            })
+
+            flash(f"¡ÉXITO! Contraseña temporal: {temp_pass} (cámbiala al entrar)", "success")
+            return redirect(url_for("auth.login"))
+
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"REGISTER ERROR: {str(e)}")
+            flash(f"Error interno: {str(e)}", "danger")
+            return render_template("auth/register.html", form=form)
+    
+    else:
+        # === ERRORES DE VALIDACIÓN ===
+        if request.method == "POST":
+            current_app.logger.info(f"Form errors: {form.errors}")
+            for field, errors in form.errors.items():
+                for error in errors:
+                    flash(f"{field}: {error}", "danger")
+        else:
+            current_app.logger.info("GET /register - Formulario vacío")
 
     return render_template("auth/register.html", form=form)
 
