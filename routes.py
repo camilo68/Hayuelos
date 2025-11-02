@@ -34,9 +34,9 @@ def login():
 
     form = LoginForm()
     if form.validate_on_submit():
-        usuario = form.username.data.strip()
+        usuario = str(form.username.data).strip()
         contrasena = form.password.data
-
+        
         empleado = Empleado.query.filter(
             (Empleado.usuario == usuario) | (Empleado.numero_documento == usuario)
         ).first()
@@ -73,19 +73,19 @@ def register():
     if form.validate_on_submit():
         try:
             # === VERIFICAR DUPLICADOS ===
-            doc = form.numero_documento.data.strip()
+            doc = str(form.numero_documento.data).strip()
             email = form.email.data.strip().lower()
             usuario = form.usuario.data.strip()
             
-            if Empleado.query.filter_by(numero_documento=doc).first():
+            if Empleado.query.filter(Empleado.numero_documento == doc).first():
                 flash("Número de documento ya registrado", "danger")
                 return render_template("auth/register.html", form=form)
             
-            if Empleado.query.filter_by(email=email).first():
+            if Empleado.query.filter(Empleado.email == email).first():
                 flash("Email ya registrado", "danger")
                 return render_template("auth/register.html", form=form)
             
-            if Empleado.query.filter_by(usuario=usuario).first():
+            if Empleado.query.filter(Empleado.usuario == usuario).first():
                 flash("Usuario ya existe", "danger")
                 return render_template("auth/register.html", form=form)
 
@@ -111,6 +111,7 @@ def register():
             )
             db.session.add(empleado)
             db.session.commit()
+            
 
             registrar_auditoria('CREATE', 'empleado', empleado.id_empleados, None, {
                 'usuario': empleado.usuario, 'email': empleado.email
@@ -530,43 +531,7 @@ def carga_masiva():
             errors = []
 
             # === MEDICIONES ===
-            if tipo_carga == 'mediciones':
-                required = ['tanque_id', 'medida_combustible', 'galones', 'tipo_medida', 'novedad', 'fecha_hora_registro', 'empleado_id']
-                if not all(col in df.columns for col in required):
-                    flash(f"Columnas requeridas: {', '.join(required)}", "danger")
-                    return redirect(request.url)
-                
-                for idx, row in df.iterrows():
-                    try:
-                        tanque_id = int(row['tanque_id'])
-                        empleado_id = int(row['empleado_id'])
-                        tanque = Tanque.query.get(tanque_id)
-                        empleado = Empleado.query.get(empleado_id)
-                        
-                        if not tanque:
-                            errors.append(f"Fila {idx+2}: tanque_id {tanque_id} no existe")
-                            continue
-                        if not empleado:
-                            errors.append(f"Fila {idx+2}: empleado_id {empleado_id} no existe")
-                            continue
-                        
-                        medida = float(row['medida_combustible'])
-                        galones = float(row['galones'])
-                        fecha = datetime.strptime(str(row['fecha_hora_registro']), '%Y-%m-%d %H:%M:%S')
-                        
-                        medicion = RegistroMedida(
-                            id_tanques=tanque.id_tanques,
-                            id_empleados=empleado.id_empleados,
-                            medida_combustible=medida,
-                            galones=galones,
-                            tipo_medida=row['tipo_medida'],
-                            novedad=row.get('novedad', ''),
-                            fecha_hora_registro=fecha
-                        )
-                        db.session.add(medicion)
-                        count += 1
-                    except Exception as e:
-                        errors.append(f"Fila {idx+2}: {str(e)}")
+            
 
             # === EMPLEADOS ===
             if tipo_carga == 'empleados':
@@ -576,30 +541,37 @@ def carga_masiva():
                     return redirect(request.url)
                 
                 for idx, row in df.iterrows():
-                    if Empleado.query.filter_by(numero_documento=row['numero_documento']).first():
-                        errors.append(f"Fila {idx+2}: Documento duplicado")
+                    doc_str = str(row['numero_documento']).strip()
+                    usuario_str = str(row['usuario']).strip()
+                    email_str = str(row['email']).strip().lower()
+                    
+                    if Empleado.query.filter(Empleado.numero_documento == doc_str).first():
+                        errors.append(f"Fila {idx+2}: Documento {doc_str} duplicado")
                         continue
-                    if Empleado.query.filter_by(usuario=row['usuario']).first():
-                        errors.append(f"Fila {idx+2}: Usuario duplicado")
+                    if Empleado.query.filter(Empleado.usuario == usuario_str).first():
+                        errors.append(f"Fila {idx+2}: Usuario {usuario_str} duplicado")
+                        continue
+                    if Empleado.query.filter(Empleado.email == email_str).first():
+                        errors.append(f"Fila {idx+2}: Email {email_str} duplicado")
                         continue
                     
-                    temp_pass = str(row['numero_documento'])[-4:]
+                    temp_pass = doc_str[-4:] if len(doc_str) >= 4 else doc_str
                     hash_pwd = bcrypt.hashpw(temp_pass.encode(), bcrypt.gensalt()).decode()
                     
                     empleado = Empleado(
-                        nombre_empleado=row['nombre_empleado'],
-                        apellido_empleado=row['apellido_empleado'],
-                        numero_documento=row['numero_documento'],
-                        tipo_documento=row.get('tipo_documento', 'CC'),
-                        email=row['email'],
-                        telefono=row.get('telefono', ''),
-                        direccion=row.get('direccion', ''),
-                        cargo_establecido=row.get('cargo_establecido', 'Islero'),
-                        usuario=row['usuario'],
+                        nombre_empleado=str(row['nombre_empleado']).strip(),
+                        apellido_empleado=str(row['apellido_empleado']).strip(),
+                        numero_documento=doc_str,
+                        tipo_documento=str(row.get('tipo_documento', 'CC')),
+                        email=email_str,
+                        telefono=str(row.get('telefono', '')).strip() or None,
+                        direccion=str(row.get('direccion', '')).strip() or None,
+                        cargo_establecido=str(row.get('cargo_establecido', 'Islero')),
+                        usuario=usuario_str,
                         contrasena=hash_pwd,
                         temporal=True,
-                        activo=row.get('activo', True),
-                        aceptado_terminos=row.get('aceptado_terminos', False)
+                        activo=bool(row.get('activo', True)),
+                        aceptado_terminos=bool(row.get('aceptado_terminos', False))
                     )
                     db.session.add(empleado)
                     count += 1
