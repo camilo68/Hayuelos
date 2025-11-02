@@ -2,6 +2,8 @@
 import os
 from flask import Flask
 from extensions import db, login_manager, migrate, csrf, mail
+from dotenv import load_dotenv
+load_dotenv()  # Agrega esto al inicio
 
 def create_app():
     app = Flask(__name__)

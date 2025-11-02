@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+
+# Virtualenv
+venv/
+ENV/
+env/
+
+# Flask
+instance/
+.webassets-cache
+.flaskenv
+.flaskenv.*
+
+# Database
+*.db
+*.sqlite3
+*.sql
+
+# Uploads y archivos grandes
+static/uploads/
+*.xlsx
+*.csv
+
+# Env files
+.env
+.env.local
+
+# IDEs
+.vscode/
+.idea/
+*.sublime-*
+
+# OS
+.DS_Store
+Thumbs.db
