@@ -6,7 +6,7 @@ Aplicación web para la gestión de mediciones y operación de estación de serv
 Estado
 - Backend: Flask con blueprints.
 - Frontend: Templates Jinja2 + Bootstrap.
-- DB: SQLAlchemy (Postgres / MySQL), migraciones con Flask-Migrate (recomendado).
+- DB: SQLAlchemy (Postgres / MySQL), migraciones con Flask-Migrate.
 - Despliegue: Preparado para Render; ajustes para DATABASE_URL incluidos.
 
 Características principales
@@ -61,15 +61,6 @@ Despliegue en Render (resumen)
 - Asegúrate de definir las environment variables en el dashboard (DATABASE_URL, SESSION_SECRET, MAIL_*).
 - Comando de build: pip install -r requirements.txt
 - Start command: gunicorn main:app --bind 0.0.0.0:$PORT
-
-Buenas prácticas recomendadas (acciones prioritarias)
-1. Añadir README.md y .env.example (hecho aquí).
-2. Configurar CI (GitHub Actions) para lint + tests.
-3. Extraer lógica a services/ y repositories/ para testabilidad.
-4. Añadir tests unitarios y de integración.
-5. No usar db.create_all() en producción; usar migraciones versionadas (flask-migrate).
-6. Añadir logging estructurado y rotación de logs.
-7. Añadir documentación de la API (OpenAPI / Postman) si debes exponer endpoints.
 
 Cómo contribuir
 - Fork + branch feature/<nombre>
